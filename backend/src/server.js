@@ -8,11 +8,15 @@ const adminRoutes = require('./routes/admin');
 const treeRoutes = require('./routes/tree');
 const walletRoutes = require('./routes/wallet');
 const maintenanceRoutes = require('./routes/maintenance');
+const noticeRoutes = require('./routes/notice');
 
 const app = express();
 app.use(express.json());
 
+app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+
 app.use('/api/auth', authRoutes);
+app.use('/api/notices', noticeRoutes);
 app.use('/api/user', requireAuth, requireRole('MEMBER', 'ADMIN'), userRoutes);
 app.use('/api/order', requireAuth, requireRole('MEMBER'), orderRoutes);
 app.use('/api/admin', requireAuth, requireRole('ADMIN'), adminRoutes);

@@ -96,4 +96,25 @@ async function approveOrder(req, res, next) {
   }
 }
 
-module.exports = { listPendingOrders, approveOrder };
+async function rejectOrder(req, res, next) {
+  const paymentRequestId = req.params.paymentRequestId || req.body.paymentRequestId;
+  const { remarks } = req.body;
+  if (!paymentRequestId) return res.status(400).json({ message: 'paymentRequestId is required' });
+
+  try {
+    const result = await db.query(
+      `UPDATE payment_requests
+       SET status = 'REJECTED', remarks = $2, approved_by = $3, approved_at = NOW()
+       WHERE id = $1 AND status = 'PENDING'
+       RETURNING id, status, remarks`,
+      [paymentRequestId, remarks || 'Rejected by admin', req.user.id],
+    );
+
+    if (!result.rowCount) return res.status(404).json({ message: 'Pending payment request not found' });
+    return res.json({ message: 'Order rejected', order: result.rows[0] });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+module.exports = { listPendingOrders, approveOrder, rejectOrder };
