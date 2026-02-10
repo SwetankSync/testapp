@@ -127,3 +127,20 @@ CREATE TABLE IF NOT EXISTS hold_events (
   reason TEXT NOT NULL,
   released BOOLEAN NOT NULL DEFAULT FALSE
 );
+
+
+CREATE TABLE IF NOT EXISTS levels (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  level_no INT UNIQUE NOT NULL,
+  target_sp NUMERIC(14,2) NOT NULL,
+  bonus_amount NUMERIC(14,2) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO levels (level_no, target_sp, bonus_amount)
+VALUES
+  (1, 450, 450),
+  (2, 900, 900),
+  (3, 1800, 1800),
+  (4, 3600, 3600)
+ON CONFLICT (level_no) DO NOTHING;

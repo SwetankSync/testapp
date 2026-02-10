@@ -117,4 +117,56 @@ async function rejectOrder(req, res, next) {
   }
 }
 
-module.exports = { listPendingOrders, approveOrder, rejectOrder };
+
+async function updateMember(req, res, next) {
+  const { memberId } = req.params;
+  const { isBlocked, sponsorCode } = req.body;
+
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    const member = await client.query('SELECT id, member_code, sponsor_id FROM users WHERE id = $1 FOR UPDATE', [memberId]);
+    if (!member.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: 'Member not found' });
+    }
+
+    let sponsorId = member.rows[0].sponsor_id;
+    let sponsorPath = '/Admin';
+    if (sponsorCode) {
+      const sponsor = await client.query('SELECT id, path FROM users WHERE member_code = $1', [sponsorCode]);
+      if (!sponsor.rowCount) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ message: 'Invalid sponsor code' });
+      }
+      sponsorId = sponsor.rows[0].id;
+      sponsorPath = sponsor.rows[0].path;
+    } else if (sponsorId) {
+      const existingSponsor = await client.query('SELECT path FROM users WHERE id = $1', [sponsorId]);
+      sponsorPath = existingSponsor.rowCount ? existingSponsor.rows[0].path : '/Admin';
+    }
+
+    const newPath = `${sponsorPath}/${member.rows[0].member_code}`;
+    await client.query(
+      `UPDATE users
+       SET is_blocked = COALESCE($2, is_blocked),
+           status = CASE WHEN COALESCE($2, FALSE) THEN 'BLOCKED' ELSE CASE WHEN status='BLOCKED' THEN 'RED' ELSE status END END,
+           sponsor_id = $3,
+           path = $4,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [memberId, typeof isBlocked === 'boolean' ? isBlocked : null, sponsorId, newPath],
+    )
+
+    await client.query('COMMIT');
+    return res.json({ message: 'Member updated successfully' });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    return next(error);
+  } finally {
+    client.release();
+  }
+}
+
+module.exports = { listPendingOrders, approveOrder, rejectOrder, updateMember };
