@@ -4,16 +4,48 @@ const db = require('../db');
 
 function generateMemberCode() {
   const random = Math.floor(100000 + Math.random() * 900000);
-  return `ID${Date.now().toString().slice(-6)}${random}`;
+  return `SL${random}`;
 }
 
-async function createUniqueMemberCode(client, maxAttempts = 5) {
+async function createUniqueMemberCode(client, maxAttempts = 10) {
   for (let i = 0; i < maxAttempts; i += 1) {
     const code = generateMemberCode();
     const exists = await client.query('SELECT 1 FROM users WHERE member_code = $1', [code]);
     if (!exists.rowCount) return code;
   }
   throw new Error('Unable to generate unique member code');
+}
+
+async function validateSponsor(req, res, next) {
+  const sponsorCode = req.params.id;
+  try {
+    const result = await db.query('SELECT id, member_code, full_name, status FROM users WHERE member_code = $1', [sponsorCode]);
+    if (!result.rowCount) return res.status(404).json({ valid: false, message: 'Sponsor not found' });
+    return res.json({ valid: true, sponsor: result.rows[0] });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function forgotPassword(req, res, next) {
+  const { emailOrPhone } = req.body;
+  if (!emailOrPhone) return res.status(400).json({ message: 'emailOrPhone is required' });
+
+  try {
+    const user = await db.query('SELECT id, email, phone FROM users WHERE email = $1 OR phone = $1', [emailOrPhone]);
+    if (!user.rowCount) return res.json({ message: 'If account exists, reset instructions were sent.' });
+
+    const token = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    await db.query(
+      `INSERT INTO password_resets (user_id, reset_token, expires_at)
+       VALUES ($1, $2, NOW() + INTERVAL '15 minutes')`,
+      [user.rows[0].id, token],
+    );
+
+    return res.json({ message: 'Reset initiated', tokenPreview: token });
+  } catch (error) {
+    return next(error);
+  }
 }
 
 async function register(req, res, next) {
@@ -95,4 +127,4 @@ async function login(req, res, next) {
   }
 }
 
-module.exports = { register, login };
+module.exports = { register, login, validateSponsor, forgotPassword };

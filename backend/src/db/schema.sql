@@ -144,3 +144,24 @@ VALUES
   (3, 1800, 1800),
   (4, 3600, 3600)
 ON CONFLICT (level_no) DO NOTHING;
+
+
+CREATE TABLE IF NOT EXISTS expenses (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title VARCHAR(200) NOT NULL,
+  amount NUMERIC(12,2) NOT NULL,
+  mode VARCHAR(20) NOT NULL CHECK (mode IN ('CASH','DEBIT','CREDIT')),
+  kind VARCHAR(20) NOT NULL CHECK (kind IN ('DEBIT','CREDIT')),
+  notes TEXT,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS password_resets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reset_token TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
